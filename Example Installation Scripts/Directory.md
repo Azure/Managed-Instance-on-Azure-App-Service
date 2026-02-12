@@ -3,7 +3,7 @@ title: Directory of Example Installation Scripts for different scenarios
 description: See examples of Installation Scripts which setup common dependencies.
 author: anwestg
 ms.topic: getting-started
-ms.date: 11/17/2025
+ms.date: 02/12/2026
 ms.author: anwestg
 ms.reviewer:
 ---
@@ -21,3 +21,4 @@ This directory contains a number of example Installation Scripts, each demonstra
 |[InstallMSMQ.ps1](InstallMSMQ.ps1)| Script which installs MSMQ Role and creates a queue ready to receive messages |
 |[InstallComponent.ps1](InstallComponent.ps1)| Script which demonstrates how to run component installers such as Crystal Reports, Drivers, MSIs, Exes. |
 |[InstallFont.ps1](InstallFont.ps1)| Script which installs provided font. |
+|[InstallLanguagePack.ps1](InstallLanguagePack.ps1)| Script which shows how to install Language Packs for .NET Framework 4.8.1 on Windows Server 2022 |
