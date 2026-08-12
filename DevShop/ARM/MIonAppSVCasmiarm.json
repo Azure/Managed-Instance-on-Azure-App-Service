@@ -1,0 +1,108 @@
+
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "planName": {
+      "type": "string",
+      "defaultValue": "devshop-plan"
+    },
+    "virtualNetworkSubnetId": {
+      "type": "string"
+    },
+    "databaseSecretUri": {
+      "type": "securestring"
+    },
+    "installScriptUri": {
+      "type": "securestring"
+    },
+    "storageAccountName": {
+      "type": "string"
+    },
+    "fileShareSecretUri": {
+      "type": "securestring"
+    },
+    "userAssignedIdentityResourceId": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "location": "[parameters('location')]",
+      "name": "[parameters('planName')]",
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-11-01",
+      "properties": {
+        "RdpEnabled": false,
+        "reserved": false,
+        "zoneRedundant": false,
+        "isCustomMode": true,
+        "Network": {
+          "VirtualNetworkSubnetId": "[parameters('virtualNetworkSubnetId')]"
+        },
+        "registryAdapters": [
+          {
+            "registryKey": "HKEY_LOCAL_MACHINE/Software/Devshop/DBConnection",
+            "type": "String",
+            "keyVaultSecretReference": {
+              "secretUri": "[parameters('databaseSecretUri')]"
+            }
+          }
+        ],
+        "installScripts": [
+          {
+            "name": "Script1",
+            "source": {
+              "sourceUri": "[parameters('installScriptUri')]",
+              "type": "RemoteAzureBlob"
+            }
+          }
+        ],
+        "storageMounts": [
+          {
+            "name": "storage1",
+            "type": "AzureFiles",
+            "source": "[concat('\\\\\\\\', parameters('storageAccountName'), '.file.core.windows.net\\\\mountfs')]",
+            "destinationPath": "k:\\mountfs",
+            "credentialsKeyVaultReference": {
+              "secretUri": "[parameters('fileShareSecretUri')]"
+            }
+          },
+          {
+            "name": "storage2",
+            "type": "AzureFiles",
+            "source": "[concat('\\\\\\\\', parameters('storageAccountName'), '.file.core.windows.net\\\\samplefileshare')]",
+            "destinationPath": "l:\\samplefileshare",
+            "credentialsKeyVaultReference": {
+              "secretUri": "[parameters('fileShareSecretUri')]"
+            }
+          },
+          {
+            "name": "storage3",
+            "type": "LocalStorage",
+            "destinationPath": "h:\\"
+          }
+        ],
+
+        "planDefaultIdentity": {
+          "identityType": "UserAssigned",
+          "userAssignedIdentityResourceId": "[parameters('userAssignedIdentityResourceId')]"
+        }
+      },
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[parameters('userAssignedIdentityResourceId')]": {}
+        }
+      },
+      "sku": {
+        "name": "P1V4",
+        "capacity": 1
+      }
+    }
+  ]
+}
