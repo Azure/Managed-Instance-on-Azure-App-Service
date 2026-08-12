@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "northeurope"
+    },
+    "resourcePrefix": {
+      "value": "devshp"
+    },
+    "databaseAuthenticationMode": {
+      "value": "ManagedIdentity"
+    },
+    "sqlEntraAdministratorLogin": {
+      "value": "<your-entra-display-name>"
+    },
+    "sqlEntraAdministratorObjectId": {
+      "value": "<your-entra-object-id>"
+    },
+    "sqlEntraAdministratorPrincipalType": {
+      "value": "User"
+    },
+    "sqlDatabaseName": {
+      "value": "devShop"
+    }
+  }
+}

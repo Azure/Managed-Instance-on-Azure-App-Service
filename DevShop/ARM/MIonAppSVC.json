@@ -1,0 +1,596 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "tmplocation": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Temp Location for SQL resources. To be deleted"
+      }
+    },
+    "resourcePrefix": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "resource prefix used to name several of the resources"
+      }
+    },
+    "vaults_l501_kv_name": {
+      "defaultValue": "[format('{0}{1}kv', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "servers_l501asmisqlserver_name": {
+      "defaultValue": "[format('{0}{1}sqlser', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "virtualNetworks_l501_net_name": {
+      "defaultValue": "[format('{0}{1}net', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "bastionHosts_l501_bastion_name": {
+      "defaultValue": "[format('{0}{1}bastion', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "storageAccounts_l501storage_name": {
+      "defaultValue": "[format('{0}{1}lstor', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "publicIPAddresses_l501_bastion_pip_name": {
+      "defaultValue": "[format('{0}{1}bastionpip', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "userAssignedIdentities_l501_identity_name": {
+      "defaultValue": "[format('{0}{1}identity', parameters('resourcePrefix'), uniqueString(resourceGroup().id))]",
+      "type": "String"
+    },
+    "databaseAuthenticationMode": {
+      "type": "string",
+      "defaultValue": "ManagedIdentity",
+      "allowedValues": [
+        "ManagedIdentity",
+        "SqlPassword"
+      ],
+      "metadata": {
+        "description": "Database authentication mode. ManagedIdentity is recommended; SqlPassword is an optional compatibility fallback."
+      }
+    },
+    "sqlEntraAdministratorLogin": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Display name of the Entra administrator. Required when databaseAuthenticationMode is ManagedIdentity."
+      }
+    },
+    "sqlEntraAdministratorObjectId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Object ID of the Entra administrator. Required when databaseAuthenticationMode is ManagedIdentity."
+      }
+    },
+    "sqlEntraAdministratorPrincipalType": {
+      "type": "string",
+      "defaultValue": "User",
+      "allowedValues": [
+        "User",
+        "Group",
+        "Application"
+      ],
+      "metadata": {
+        "description": "Principal type of the Entra administrator."
+      }
+    },
+    "sqlAdministratorLoginPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional SQL administrator password. Used only when databaseAuthenticationMode is SqlPassword."
+      }
+    },
+    "sqladminUsername": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional SQL administrator username. Used only when databaseAuthenticationMode is SqlPassword."
+      }
+    },
+    "sqlDatabaseName": {
+      "type": "string",
+      "defaultValue": "devShop",
+      "metadata": {
+        "description": "SQL database name."
+      }
+    }
+  },
+  "variables": {
+    "sqlServerBaseProperties": {
+      "version": "12.0",
+      "minimalTlsVersion": "1.2",
+      "publicNetworkAccess": "Enabled",
+      "restrictOutboundNetworkAccess": "Disabled"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2024-12-01-preview",
+      "name": "[parameters('vaults_l501_kv_name')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]"
+      ],
+      "properties": {
+        "sku": {
+          "name": "standard",
+          "family": "A"
+        },
+        "accessPolicies": [
+         
+        ],
+        "enabledForDeployment": false,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enableRbacAuthorization": true,
+        "publicNetworkAccess": "Enabled",
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny",
+          "virtualNetworkRules": [
+            {
+              "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]",
+              "ignoreMissingVnetServiceEndpoint": false
+            }
+          ]
+        },
+        "tenantId": "[subscription().tenantId]"
+      }
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2024-11-30",
+      "name": "[parameters('userAssignedIdentities_l501_identity_name')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2022-07-01",
+      "name": "[parameters('publicIPAddresses_l501_bastion_pip_name')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "publicIPAddressVersion": "IPv4",
+        "publicIPAllocationMethod": "Static",
+        "idleTimeoutInMinutes": 4,
+
+        "ddosSettings": {
+          "protectionMode": "VirtualNetworkInherited"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2022-07-01",
+      "name": "[parameters('virtualNetworks_l501_net_name')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "privateEndpointVNetPolicies": "Disabled",
+        "subnets": [
+          {
+            "name": "AzureBastionSubnet",
+            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'AzureBastionSubnet')]",
+            "properties": {
+              "addressPrefix": "10.0.1.0/26",
+
+              "privateEndpointNetworkPolicies": "Disabled",
+              "privateLinkServiceNetworkPolicies": "Enabled"
+            },
+            "type": "Microsoft.Network/virtualNetworks/subnets"
+          },
+          {
+            "name": "default",
+            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default')]",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24",
+
+              "privateEndpointNetworkPolicies": "Disabled",
+              "privateLinkServiceNetworkPolicies": "Enabled"
+            },
+            "type": "Microsoft.Network/virtualNetworks/subnets"
+          },
+          {
+            "name": "default2",
+            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]",
+            "properties": {
+              "addressPrefix": "10.0.2.0/24",
+              "delegations": [
+                {
+                  "name": "0",
+                  "id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2'), '/delegations/0')]",
+                  "properties": {
+                    "serviceName": "Microsoft.Web/serverFarms"
+                  },
+                  "type": "Microsoft.Network/virtualNetworks/subnets/delegations"
+                }
+              ],
+              "privateEndpointNetworkPolicies": "Disabled",
+              "privateLinkServiceNetworkPolicies": "Enabled"
+            },
+            "type": "Microsoft.Network/virtualNetworks/subnets"
+          }
+        ],
+
+        "enableDdosProtection": false
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[parameters('servers_l501asmisqlserver_name')]",
+      "location": "[resourceGroup().location]",
+      "kind": "v12.0",
+      "properties": "[if(equals(parameters('databaseAuthenticationMode'), 'SqlPassword'), union(variables('sqlServerBaseProperties'), createObject('administratorLogin', parameters('sqladminUsername'), 'administratorLoginPassword', parameters('sqlAdministratorLoginPassword'))), union(variables('sqlServerBaseProperties'), createObject('administrators', createObject('administratorType', 'ActiveDirectory', 'principalType', parameters('sqlEntraAdministratorPrincipalType'), 'login', parameters('sqlEntraAdministratorLogin'), 'sid', parameters('sqlEntraAdministratorObjectId'), 'tenantId', subscription().tenantId, 'azureADOnlyAuthentication', true()))))]"
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2024-01-01",
+      "name": "[parameters('storageAccounts_l501storage_name')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]"
+      ],
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny",
+          "virtualNetworkRules": [
+            {
+              "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]",
+              "action": "Allow"
+            }
+          ]
+        },
+        "supportsHttpsTrafficOnly": true,
+        "encryption": {
+          "services": {
+            "file": {
+              "keyType": "Account",
+              "enabled": true
+            },
+            "blob": {
+              "keyType": "Account",
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        },
+        "accessTier": "Hot"
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2022-07-01",
+      "name": "[concat(parameters('virtualNetworks_l501_net_name'), '/AzureBastionSubnet')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_l501_net_name'))]"
+      ],
+      "properties": {
+        "addressPrefix": "10.0.1.0/26",
+
+        "privateEndpointNetworkPolicies": "Disabled",
+        "privateLinkServiceNetworkPolicies": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2022-07-01",
+      "name": "[concat(parameters('virtualNetworks_l501_net_name'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_l501_net_name'))]"
+      ],
+      "properties": {
+        "addressPrefix": "10.0.0.0/24",
+
+        "privateEndpointNetworkPolicies": "Disabled",
+        "privateLinkServiceNetworkPolicies": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2022-07-01",
+      "name": "[concat(parameters('virtualNetworks_l501_net_name'), '/default2')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_l501_net_name'))]"
+      ],
+      "properties": {
+        "addressPrefix": "10.0.2.0/24",
+        "serviceEndpoints": [
+          {
+            "service": "Microsoft.KeyVault"
+          },
+          {
+            "service": "Microsoft.Sql"
+          },
+          {
+            "service": "Microsoft.Storage"
+          }
+        ],
+        "delegations": [
+          {
+            "name": "0",
+            "id": "[concat(resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2'), '/delegations/0')]",
+            "properties": {
+              "serviceName": "Microsoft.Web/serverFarms"
+            },
+            "type": "Microsoft.Network/virtualNetworks/subnets/delegations"
+          }
+        ],
+        "privateEndpointNetworkPolicies": "Disabled",
+        "privateLinkServiceNetworkPolicies": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_l501asmisqlserver_name'), '/', parameters('sqlDatabaseName'))]",
+      "location": "[parameters('tmplocation')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('servers_l501asmisqlserver_name'))]"
+      ],
+      "sku": {
+        "name": "GP_Gen5",
+        "tier": "GeneralPurpose",
+        "family": "Gen5",
+        "capacity": 4
+      },
+      "kind": "v12.0,user,vcore",
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": 34359738368,
+        "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+        "zoneRedundant": false,
+        "licenseType": "LicenseIncluded",
+        "readScale": "Disabled",
+        "requestedBackupStorageRedundancy": "Local",
+
+        "isLedgerOn": false,
+        "availabilityZone": "NoPreference"
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/virtualNetworkRules",
+      "apiVersion": "2024-05-01-preview",
+      "name": "[concat(parameters('servers_l501asmisqlserver_name'), '/app-subnet')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('servers_l501asmisqlserver_name'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]"
+      ],
+      "properties": {
+        "virtualNetworkSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'default2')]",
+        "ignoreMissingVnetServiceEndpoint": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "properties": {
+
+        "deleteRetentionPolicy": {
+          "allowPermanentDelete": false,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "sku": {
+        "name": "Standard_LRS",
+        "tier": "Standard"
+      },
+      "properties": {
+
+        "shareDeleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/queueServices",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/tableServices",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+
+      }
+    },
+    {
+      "type": "Microsoft.Network/bastionHosts",
+      "apiVersion": "2024-07-01",
+      "name": "[parameters('bastionHosts_l501_bastion_name')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_l501_bastion_pip_name'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'AzureBastionSubnet')]"
+      ],
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "scaleUnits": 2,
+        "enableTunneling": true,
+        "enableIpConnect": true,
+        "enableFileCopy": false,
+        "disableCopyPaste": false,
+        "enableShareableLink": false,
+        "enableKerberos": false,
+        "enableSessionRecording": false,
+        "ipConfigurations": [
+          {
+            "name": "bastion_ip_config",
+            "id": "[concat(resourceId('Microsoft.Network/bastionHosts', parameters('bastionHosts_l501_bastion_name')), '/bastionHostIpConfigurations/bastion_ip_config')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_l501_bastion_pip_name'))]"
+              },
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_l501_net_name'), 'AzureBastionSubnet')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default/scriptcontainer')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_l501storage_name'), 'default')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+        "immutableStorageWithVersioning": {
+          "enabled": false
+        },
+        "defaultEncryptionScope": "$account-encryption-key",
+        "denyEncryptionScopeOverride": false,
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default/mountfs')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('storageAccounts_l501storage_name'), 'default')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+        "accessTier": "TransactionOptimized",
+        "shareQuota": 100,
+        "enabledProtocols": "SMB"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+      "apiVersion": "2024-01-01",
+      "name": "[concat(parameters('storageAccounts_l501storage_name'), '/default/samplefileshare')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('storageAccounts_l501storage_name'), 'default')]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+        "accessTier": "TransactionOptimized",
+        "shareQuota": 100,
+        "enabledProtocols": "SMB"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', parameters('vaults_l501_kv_name'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('vaults_l501_kv_name')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name')), 'Key Vault Secrets User')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name')), '2024-11-30').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('vaults_l501_kv_name'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', parameters('storageAccounts_l501storage_name'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name')), 'Storage Blob Data Reader')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name')), '2024-11-30').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-12-01-preview",
+      "name": "[concat(parameters('vaults_l501_kv_name'), '/SqlConnectionString')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('vaults_l501_kv_name'))]",
+        "[resourceId('Microsoft.Sql/servers', parameters('servers_l501asmisqlserver_name'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name'))]"
+      ],
+      "properties": {
+        "value": "[if(equals(parameters('databaseAuthenticationMode'), 'SqlPassword'), concat('Server=tcp:', reference(resourceId('Microsoft.Sql/servers', parameters('servers_l501asmisqlserver_name'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', parameters('sqlDatabaseName'), ';User ID=', parameters('sqladminUsername'), ';Password=', parameters('sqlAdministratorLoginPassword'), ';Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'), concat('Server=tcp:', reference(resourceId('Microsoft.Sql/servers', parameters('servers_l501asmisqlserver_name'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', parameters('sqlDatabaseName'), ';Authentication=Active Directory Managed Identity;User Id=', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('userAssignedIdentities_l501_identity_name')), '2024-11-30').clientId, ';Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'))]"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-12-01-preview",
+      "name": "[concat(parameters('vaults_l501_kv_name'), '/FileShareConnectionString')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('vaults_l501_kv_name'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name'))]"
+      ],
+      "properties": {
+        "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccounts_l501storage_name'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_l501storage_name')), '2024-01-01').keys[0].value, ';EndpointSuffix=core.windows.net')]"
+      }
+
+    }
+
+  ]
+}
