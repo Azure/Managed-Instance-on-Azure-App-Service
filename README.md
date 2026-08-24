@@ -1,6 +1,6 @@
 # Managed Instance on Azure App Service
 
-This is a repository to support the public preview of Managed Instance on Azure App Service
+This repository supports Managed Instance on Azure App Service, which is generally available for Windows web apps in select regions on Pv4 and Pmv4 pricing plans. Managed Instance doesn't support Linux or containers.
 
 This repository contains additional 
 

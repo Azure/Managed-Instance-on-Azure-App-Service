@@ -5,7 +5,7 @@ devShop is a sample ASP.NET Web Forms and Web API application targeting .NET Fra
 **Managed identity authentication is the recommended and default database configuration.** It avoids storing a database password and supports Entra-only Azure SQL policies. SQL username/password authentication remains available only as an optional compatibility fallback.
 
 > [!IMPORTANT]
-> App Service Managed Instance is a Windows-only preview. Use a currently supported region and deploy every resource to that same region. Confirm availability in the [Managed Instance quickstart](https://learn.microsoft.com/azure/app-service/quickstart-managed-instance).
+> Managed Instance on Azure App Service is generally available for Windows web apps in select regions on Pv4 and Pmv4 pricing plans. Managed Instance doesn't support Linux or containers. Deploy every resource for this sample to the same supported region, and confirm current availability in the [Managed Instance quickstart](https://learn.microsoft.com/azure/app-service/quickstart-managed-instance).
 
 ## What is deployed
 
@@ -41,6 +41,12 @@ Sign in, then display the Entra values used to administer the new database:
 ```powershell
 az login
 az ad signed-in-user show --query '{login:displayName, objectId:id}' --output json
+```
+
+To list regions where the sample's Managed Instance P1V4 plan is available, run:
+
+```powershell
+az appservice list-locations --managed-instance-enabled --sku P1V4
 ```
 
 Copy the passwordless public example to the ignored local parameter file:
@@ -314,7 +320,7 @@ MCP tools can participate in larger agentic workflows alongside Visual Studio's 
 
 | Problem | Check |
 |---|---|
-| Managed plan deployment fails | The region supports preview, P1V4 capacity is available, and all resources use the same region |
+| Managed plan deployment fails | Managed Instance is available in the selected region, P1V4 capacity is available, and all resources use the same region |
 | Installation ZIP cannot be read | The blob is private, the URL is correct, and the managed identity has Storage Blob Data Reader |
 | Database connection fails | `DBConnection` is a resolved Key Vault reference and the SQL scripts completed successfully |
 | Key Vault reference is unresolved | The web app identity has Key Vault Secrets User and can reach the vault through the managed plan subnet |
