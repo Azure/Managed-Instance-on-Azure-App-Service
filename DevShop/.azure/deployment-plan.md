@@ -24,7 +24,7 @@ Files removed: `DevShopMcpProxy/**`, `.mcp/mcp.json`, local proxy build outputs,
 | Scale | Small, single-region |
 | Budget | Template-defined development footprint; warn readers that Bastion, Azure SQL GP Gen5, and P1V4 incur ongoing charges |
 | Subscription | Selected by each reader at deployment time |
-| Location | Reader selects a currently supported App Service Managed Instance preview region |
+| Location | Reader selects a currently supported Managed Instance on Azure App Service region |
 | Compliance | No production compliance posture is claimed; readers must apply their own policy, residency, and governance requirements |
 
 ## 3. Components detected
@@ -33,14 +33,14 @@ Files removed: `DevShopMcpProxy/**`, `.mcp/mcp.json`, local proxy build outputs,
 |---|---|---|---|
 | devShop | Web UI, REST API, and built-in MCP source | ASP.NET Web Forms/Web API, .NET Framework 4.8, OpenAPI 3.0.3 | `devShop.csproj`, `openapi_mcp.json` |
 | Base infrastructure | ARM template | VNet, Bastion, Azure SQL, Storage, Key Vault, user-assigned identity | `ARM/MIonAppSVC.json` |
-| Managed plan | ARM template | App Service Managed Instance preview, Windows P1V4 | `ARM/MIonAppSVCasmiarm.json` |
+| Managed plan | ARM template | Managed Instance on Azure App Service, Windows P1V4 | ARM/MIonAppSVCasmiarm.json |
 | Database | T-SQL | Schema and sample data | `SQL` |
 
 ## 4. Recipe selection
 
 **Selected:** Existing ARM templates plus Azure CLI and PowerShell commands.
 
-**Rationale:** The repository already contains user-authored ARM templates for preview-only App Service Managed Instance properties. Converting them to AZD/Bicep would be unrelated to the requested README and could alter preview behavior.
+**Rationale:** The repository already contains user-authored ARM templates for App Service Managed Instance properties. Converting them to AZD/Bicep would be unrelated to the requested README and could alter deployment behavior.
 
 ## 5. Architecture
 
@@ -61,7 +61,7 @@ The base template defaults to Entra-only SQL with a user-assigned managed identi
 
 ## 6. Provisioning-limit checklist
 
-This documentation task deploys zero resources, so no subscription quota is consumed and no quota query is applicable. The README will require readers to confirm preview-region availability, provider registration, policy compatibility, and P1V4 capacity in their own subscription before deployment.
+This documentation task deploys zero resources, so no subscription quota is consumed and no quota query is applicable. The README will require readers to confirm Managed Instance regional availability, provider registration, policy compatibility, and P1V4 capacity in their own subscription before deployment.
 
 | Resource type changed by this task | Number deployed | Total after task | Limit/quota | Status |
 |---|---:|---:|---|---|
@@ -69,7 +69,7 @@ This documentation task deploys zero resources, so no subscription quota is cons
 
 ## 7. Planned repository changes
 
-1. Expand `README.md` with prerequisites, permissions, preview limitations, secure variables, provider registration, parameter preparation, base ARM deployment, output discovery, bootstrap script upload, SQL initialization, managed-plan deployment, web-app creation, identity/Key Vault configuration, build, ZIP deployment, verification, troubleshooting, cleanup, and official references.
+1. Expand `README.md` with prerequisites, permissions, current service limitations, secure variables, provider registration, parameter preparation, base ARM deployment, output discovery, bootstrap script upload, SQL initialization, managed-plan deployment, web-app creation, identity/Key Vault configuration, build, ZIP deployment, verification, troubleshooting, cleanup, and official references.
 2. Correct the public parameter example so its prefix satisfies the 24-character Storage account naming limit.
 3. Add the missing `ProductReviews` schema to `SQL/CreateTables.sql`, because the deployed API queries this table and a fresh deployment currently cannot use review endpoints.
 4. Explain the SQL script order and explicitly exclude `SQL/results_inserts.sql`, which targets a legacy `dbo.Inventory` table that the current schema does not create.
@@ -128,9 +128,9 @@ This documentation task deploys zero resources, so no subscription quota is cons
 - [x] Application restores and builds in Release configuration
 - [x] Web Publishing Pipeline creates a ready-to-run ZIP with repository-only files excluded
 - [x] Static RBAC review confirms Key Vault Secrets User and Storage Blob Data Reader at resource scope
-- [ ] Resource-group template validation requires reader-selected subscription, resource group, preview region, and secure parameters
+- [ ] Resource-group template validation requires reader-selected subscription, resource group, supported Managed Instance region, and secure parameters
 - [ ] What-if and Azure Policy validation require the same reader-selected Azure context
-- [ ] Preview availability and P1V4 regional capacity must be checked at deployment time
+- [ ] Managed Instance regional availability and P1V4 capacity must be checked at deployment time
 
 Cloud validation was not run because this task changes documentation and repository deployment assets only and explicitly does not deploy or target a specific subscription. The plan remains `Ready for Validation`; it must not be treated as authorization to deploy.
 
