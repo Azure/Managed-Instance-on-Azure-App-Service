@@ -43,6 +43,12 @@ az login
 az ad signed-in-user show --query '{login:displayName, objectId:id}' --output json
 ```
 
+To list regions where the sample's Managed Instance P1V4 plan is available, run:
+
+```powershell
+az appservice list-locations --managed-instance-enabled --sku P1V4
+```
+
 Copy the passwordless public example to the ignored local parameter file:
 
 ```powershell
