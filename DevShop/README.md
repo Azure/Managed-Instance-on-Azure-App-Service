@@ -5,7 +5,7 @@ devShop is a sample ASP.NET Web Forms and Web API application targeting .NET Fra
 **Managed identity authentication is the recommended and default database configuration.** It avoids storing a database password and supports Entra-only Azure SQL policies. SQL username/password authentication remains available only as an optional compatibility fallback.
 
 > [!IMPORTANT]
-> Managed Instance on Azure App Service is generally available for Windows web apps in select regions on Pv4 and Pmv4 pricing plans. Managed Instance doesn't support Linux or containers. Deploy every resource for this sample to the same supported region, and confirm current availability in the <a href="https://learn.microsoft.com/azure/app-service/quickstart-managed-instance">Managed Instance quickstart</a>.
+> Managed Instance on Azure App Service is generally available for Windows web apps in select regions on Pv4 and Pmv4 pricing plans. Managed Instance doesn't support Linux or containers. Deploy every resource for this sample to the same supported region, and confirm current availability in the [Managed Instance quickstart](https://learn.microsoft.com/azure/app-service/quickstart-managed-instance).
 
 ## What is deployed
 
